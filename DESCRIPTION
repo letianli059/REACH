@@ -1,0 +1,16 @@
+Package: reach
+Title: Regularized rank-constrained heterogeneity pursuit (REACH)
+Version: 1.0.0
+Authors@R: 
+    person(given = "Letian", family = "Li",
+           email = "lilt@mail.ustc.edu.cn", role = c("aut", "cre"),
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: Regularized rank-constrained heterogeneity pursuit for heterogeneous sparse reduced-rank regression.
+Depends: R (>= 3.4.0)
+Imports: MASS, rrpack, Rcpp (>= 0.12.0)
+LinkingTo: Rcpp, RcppArmadillo
+License:  GPL (>= 3)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Maintainer: Letian Li <lilt@mail.ustc.edu.cn>
