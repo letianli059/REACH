@@ -8,7 +8,7 @@ using namespace std;
 using namespace sugar;
 
 // Row-wise soft-thresholding operator
-arma::mat RT(arma::mat A, double lambda) {
+arma::mat RT_ridge(arma::mat A, double lambda) {
   int nrow = A.n_rows;
   int ncol = A.n_cols;
   arma::mat res(nrow, ncol);
@@ -22,7 +22,7 @@ arma::mat RT(arma::mat A, double lambda) {
 }
 
 // Group lasso for Updating U
-arma::mat GLasso(arma::mat Y, arma::mat X, arma::mat Z,
+arma::mat GLasso_ridge(arma::mat Y, arma::mat X, arma::mat Z,
                  arma::mat U0, arma::mat V, arma::mat W,
                  double lambda, int maxiter){
   int n = Y.n_rows, p = X.n_cols;
@@ -30,7 +30,7 @@ arma::mat GLasso(arma::mat Y, arma::mat X, arma::mat Z,
   arma::mat U = U0, tY = Y - Z*W;
 
   for (int i = 0; i < maxiter-1; i++){
-    U = RT(1/M*X.t()*tY*V+(eye(p,p)-1/M*X.t()*X)*U, n*lambda/M);
+    U = RT_ridge(1/M*X.t()*tY*V+(eye(p,p)-1/M*X.t()*X)*U, n*lambda/M);
   }
 
   return U;
@@ -66,7 +66,7 @@ Rcpp::List ridge_Rcpp(arma::mat Y, arma::mat X, arma::mat Z,
       break;
     }
     // Update U
-    Utt = GLasso(Y, X, Z, Ut, Vt, Wt, lb, 10);
+    Utt = GLasso_ridge(Y, X, Z, Ut, Vt, Wt, lb, 10);
     // Update V
     arma::mat tY = Y - Z*Wt, Uw, Vw;
     arma::vec d;
