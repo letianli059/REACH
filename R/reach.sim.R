@@ -6,6 +6,7 @@
 #' @param n,p,m,q model dimensions
 #' @param r model rank
 #' @param s model sparsity level
+#' @param d_Theta parameter of the distribution for generating \eqn{\Theta_k}
 #' @param rho_X correlation parameter in the generation of covariates
 #' @param sigma_X variance parameter in the generation of covariates
 #' @param s2n signal to noise ratio
@@ -14,7 +15,7 @@
 #'
 #' @importFrom stats rnorm rbinom
 #' @export
-reach.sim <- function(n, p, q, m, r, s, rho_X = .5, sigma_X = 1, s2n = 1){
+reach.sim <- function(n, p, q, m, r, s, d_Theta = 5, rho_X = .5, sigma_X = 1, s2n = 2){
   # Generate X
   Sigma_X <- matrix(nrow = p, ncol = p, rho_X)
   diag(Sigma_X) <- sigma_X
@@ -37,7 +38,9 @@ reach.sim <- function(n, p, q, m, r, s, rho_X = .5, sigma_X = 1, s2n = 1){
   B2 <- matrix(rnorm(r*q,0,sigma_X), nrow = r, ncol = q)
   B <- rbind(B1%*%B2, matrix(0,nrow = p-s,ncol = q))
   # Generate W
-  Theta1 <- matrix(rnorm(m*q,0.5,sigma_X), m, q)
+  #Theta1 <- matrix(d_Theta, m, q)
+  Theta1 <- matrix(runif(m*q,0,d_Theta), m, q)
+  #Theta1 <- matrix(rnorm(m*q,d_Theta,1), m, q)
   Theta2 <- -Theta1
   Theta3 <- matrix(rep(0,m*q), m, q)
   Theta <- list(Theta1,Theta2,Theta3)
@@ -56,5 +59,5 @@ reach.sim <- function(n, p, q, m, r, s, rho_X = .5, sigma_X = 1, s2n = 1){
   Y = X%*%B + Z%*%W + sigma*E
 
   # Output
-  list(Y = Y, X = X, B = B, Z_ = Z_, W = W, Theta = Theta, group = groups)
+  list(Y = Y, X = X, B = B, Z_ = Z_, Z = Z, W = W, Theta = Theta, group = groups)
 }

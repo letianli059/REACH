@@ -107,30 +107,31 @@ Rcpp::List reach_Rcpp(arma::mat Y, arma::mat X, arma::mat Z, String penalty,
       arma::mat tY = Y - Z*Wt, Uw, Vw;
       arma::vec d;
       svd(Uw, d, Vw, tY.t()*X*Utt);
-      Vtt = Uw * Vw.t();
+      Vtt = Uw.cols(0,r-1) * Vw.t();
       // Update W
       Wtt = (n*rho*Delta.t()*Delta+Z.t()*Z).i() * (Z.t()*(Y-X*Utt*Vtt.t())+n*Delta.t()*(rho*C-Phi));
+      //Wtt = (x2*rho*Delta.t()*Delta+Z.t()*Z).i() * (Z.t()*(Y-X*Utt*Vtt.t())+x2*Delta.t()*(rho*C-Phi));
       inner_res = (pow(norm(Wtt-Wt,"fro"),2)+pow(norm(Utt*Vtt.t()-Ut*Vt.t(),"fro"),2)) / 2;
 
       Ut = Utt;
       Vt = Vtt;
       Wt = Wtt;
     }
-    U = Utt;
-    V = Vtt;
-    B = U*V.t();
-    W = Wtt;
 
     // Update C
-    C_ = Delta*W + Phi/rho;
+    C_ = Delta*Wtt + Phi/rho;
     for (i = 0; i < n*(n-1)/2; i++){
       C.rows(i*m,(i+1)*m-1) = penal(C_.rows(i*m,(i+1)*m-1),rho,a,lw,penalty);
     }
     // Update Phi
-    Phi = Phi + rho*(Delta*W-C);
+    Phi = Phi + rho*(Delta*Wtt-C);
 
-    res = pow(norm(Delta*W-C,"fro"),2);
+    res = pow(norm(Delta*Wtt-C,"fro"),2);
   }
+  U = Utt;
+  V = Vtt;
+  B = U*V.t();
+  W = Wtt;
 
   // Group
   int coord = 0;
@@ -159,7 +160,7 @@ Rcpp::List reach_Rcpp(arma::mat Y, arma::mat X, arma::mat Z, String penalty,
   double GIC;
   int s;
   s = sum(mean(B,1)!=0);
-  GIC = log(pow(norm(Y-X*B-Z*W,"fro"),2)/(n*q)) + 15*(log(log(n*q))/(n*q))*(K*m*q+(s+q-r)*r);
+  GIC = log(pow(norm(Y-X*B-Z*W,"fro"),2)/(n*q)) + 10*(log(log(n*q))/(n*q))*(K*m*q+(s+q-r)*r);
 
   // Output
   Rcpp::List out;

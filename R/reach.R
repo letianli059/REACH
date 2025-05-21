@@ -23,6 +23,7 @@
 ##'   \item{Y}{input response matrix}
 ##'   \item{X}{input covariate matrix}
 ##'   \item{Z_}{input control variable matrix}
+##'   \item{Z}{diagonalized control variable matrix}
 ##'   \item{B}{estimated coefficient matrix for X}
 ##'   \item{W}{estimated coefficient matrix for Z}
 ##'   \item{Theta}{a list of estimated common value matrices}
@@ -42,13 +43,13 @@
 #' library(reach)
 #'  ## Simulate data from a heterogeneous sparse reduced-rank regression model
 #'  p <- 100; m <- 1; q <- 50; n <- 100; r <- 3; s = 5
-#'  mydata <- reach.sim(n, p, q, m, r, s, rho_X = .5, sigma_X = 1, s2n = 1)
+#'  mydata <- reach.sim(n, p, q, m, r, s)
 #'
 #'  Y <- mydata$Y
 #'  X <- mydata$X
 #'  Z_ <- mydata$Z_
 #'
-#'  fit <- reach(Y, X, Z_, penalty = "MCP")
+#'  fit <- reach(Y, X, Z_, penalty = "SCAD")
 #'
 #'  fit$s
 #'  fit$K
@@ -87,26 +88,44 @@ reach <- function(Y, X, Z_, U0 = NULL, V0 = NULL, W0 = NULL,
   Delta <- kronecker(Delta_, diag(m))
 
   # Initialization
-  library(rrpack)
   if (is.null(U0)| is.null(V0) | is.null(W0)){
-    init.rrr <- rrpack::rrr(Y, X, maxrank = r, ic.type = "GIC")
-    svd.res <- svd(init.rrr$coef)
-    U0 <- svd.res$u %*% diag(sqrt(svd.res$d))
-    V0 <- svd.res$v %*% diag(sqrt(svd.res$d))
-    W0 <- MASS::ginv(t(Z)%*%Z) %*% t(Z) %*% (Y-X%*%U0%*%t(V0))
-    init.rrr <- rrpack::rrr(Y-Z%*%W0, X, maxrank = r, ic.type = "GIC")
-    svd.res <- svd(init.rrr$coef)
-    U0 <- svd.res$u %*% diag(sqrt(svd.res$d))
-    V0 <- svd.res$v %*% diag(sqrt(svd.res$d))
-    W0 <- MASS::ginv(t(Z)%*%Z) %*% t(Z) %*% (Y-X%*%U0%*%t(V0))
+    init.srrr <- rrpack::srrr(Y, X, nrank = r, ic.type = "GIC")
+    svd.res <- svd(init.srrr$coef)
+    if (r > 1){
+      U0 <- svd.res$u[,1:r] %*% diag(sqrt(svd.res$d[1:r]))
+      V0 <- svd.res$v[,1:r] %*% diag(sqrt(svd.res$d[1:r]))
+    }else{
+      U0 <- matrix(svd.res$u[,1] * sqrt(svd.res$d[1]))
+      V0 <- matrix(svd.res$v[,1] * sqrt(svd.res$d[1]))
+    }
+    W0 <- MASS::ginv(t(Z)%*%Z) %*% t(Z) %*% (Y-X%*%init.srrr$coef)
+    lw <- .001 / sqrt(q)
+    lb <- 2*norm(X,"2")/n*sqrt(log(p))
+    # rigde
+    init.ridge <- ridge_Rcpp(Y, X, Z, U0, V0, W0, r, lb, lw, a, epsilon, 100)
+    U0 <- init.ridge$U
+    V0 <- init.ridge$V
+    W0 <- init.ridge$W
+    # initial clustering
+    w0 <- t(matrix(t(W0),q*m,n))
+    K0 <- floor(sqrt(n))
+    G0 <- kmeans(w0, K0)$cluster
+    Gamma0_ <- matrix(0, n, K0)
+    for (k in 1:K0){
+      Gamma0_[G0==k,k] <- 1
+    }
+    Gamma0 <- kronecker(Gamma0_, diag(m))
+    ZZ0 <- Z %*% Gamma0
+    Theta0 <- MASS::ginv(t(ZZ0)%*%ZZ0) %*% t(ZZ0) %*% (Y-X%*%U0%*%t(V0))
+    W0 <- Gamma0 %*% Theta0
   }
   if (is.null(lambda.B) | is.null(lambda.W)){
     lambda.B.factor <- norm(X,"2")/n*sqrt(log(p))
-    lambda.B <- seq(2*lambda.B.factor*1e-3, 2*lambda.B.factor, length.out = 10)
+    lambda.B <- seq(lambda.B.factor*1e-1, 4*lambda.B.factor, length.out = 10)
     C0 <- Delta %*% W0
     c0 <- matrix(t(C0), m*q, n*(n-1)/2)
     lambda.W.max <- rho * max(apply(c0, 2, function(x) norm(x,"2")))
-    lambda.W <- seq(lambda.W.max*1e-3, lambda.W.max*1e-1, length.out = 10)
+    lambda.W <- seq(lambda.W.max*1e-2, lambda.W.max/5, length.out = 10)
   }
 
   # Tuning
@@ -118,8 +137,10 @@ reach <- function(Y, X, Z_, U0 = NULL, V0 = NULL, W0 = NULL,
       if (is.null(out.prev)){
         out <- reach_Rcpp(Y, X, Z, penalty, U0, V0, W0, r, i, j, rho, a, epsilon, 200, epsilon, 200)
       }else{
+        #out <- reach_Rcpp(Y, X, Z, penalty, U0, V0, W0, r, i, j, rho, a, epsilon, 200, epsilon, 200)
         out <- reach_Rcpp(Y, X, Z, penalty, out.prev$U, out.prev$V, out.prev$W, r, i, j, rho, a, epsilon, 200, epsilon, 200)
       }
+      out.prev <- out
       cat("K = ", out$K, ", s = ", out$s, "\n")
       GIC.new <- out$GIC
       cat("GIC =", GIC.new, "\n")
@@ -137,28 +158,27 @@ reach <- function(Y, X, Z_, U0 = NULL, V0 = NULL, W0 = NULL,
   svd.B <- svd(out.best$B)
   d <- svd.B$d
   mu <- 1/log(n) * log(log(n))
-  r.hat <- 0
-  for (k in (r-1):1){
-    if (d[k]-d[k+1] <= sqrt(q)*mu){
-      r.hat <- k + 1
+  r.hat <- r
+  for (k in r:1){
+    if (d[k]-d[k+1] > sqrt(q)*mu){
+      r.hat <- k
+      break
     }
   }
   # Refinement
   if (r.hat != r){
-    if (r.hat == 0){
-      r <- 1
-    }else{
-      r <- r.hat
-    }
+    r <- r.hat
     GIC.best <- GIC.old <- Inf
+    out.prev <- NULL
     for (i in lambda.B){
       for (j in lambda.W){
         cat("lambda.B =", i, "lambda.W =", j, "r =", r, "\n")
-        if (i==1 & j== 1){
-          out <- reach_Rcpp(Y, X, Z, penalty, U0, V0, W0, r, i, j, rho, a, epsilon, 200, epsilon, 200)
+        if (is.null(out.prev)){
+          out <- reach_Rcpp(Y, X, Z, penalty, as.matrix(U0[,1:r]), as.matrix(V0[,1:r]), W0, r, i, j, rho, a, epsilon, 200, epsilon, 200)
         }else{
-          out <- reach_Rcpp(Y, X, Z, penalty, out$U, out$V, out$W, r, i, j, rho, a, epsilon, 200, epsilon, 200)
+          out <- reach_Rcpp(Y, X, Z, penalty, out.prev$U, out.prev$V, out.prev$W, r, i, j, rho, a, epsilon, 200, epsilon, 200)
         }
+        out.prev <- out
         cat("K = ", out$K, ", s = ", out$s, "\n")
         GIC.new <- out$GIC
         cat("GIC =", GIC.new, "\n")
