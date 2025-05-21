@@ -4,7 +4,7 @@
 \alias{reach.sim}
 \title{Simulate heterogeneous sparse reduced-rank regressions}
 \usage{
-reach.sim(n, p, q, m, r, s, rho_X = 0.5, sigma_X = 1, s2n = 1)
+reach.sim(n, p, q, m, r, s, d_Theta = 5, rho_X = 0.5, sigma_X = 1, s2n = 2)
 }
 \arguments{
 \item{n, p, m, q}{model dimensions}
@@ -12,6 +12,8 @@ reach.sim(n, p, q, m, r, s, rho_X = 0.5, sigma_X = 1, s2n = 1)
 \item{r}{model rank}
 
 \item{s}{model sparsity level}
+
+\item{d_Theta}{parameter of the distribution for generating \eqn{\Theta_k}}
 
 \item{rho_X}{correlation parameter in the generation of covariates}
 

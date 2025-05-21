@@ -5,3 +5,7 @@ reach_Rcpp <- function(Y, X, Z, penalty, U0, V0, W0, r, lb, lw, rho, a, epsilon,
     .Call(`_reach_reach_Rcpp`, Y, X, Z, penalty, U0, V0, W0, r, lb, lw, rho, a, epsilon, maxiter, inner_epsilon, inner_maxiter)
 }
 
+ridge_Rcpp <- function(Y, X, Z, U0, V0, W0, r, lb, lw, a, epsilon, maxiter) {
+    .Call(`_reach_ridge_Rcpp`, Y, X, Z, U0, V0, W0, r, lb, lw, a, epsilon, maxiter)
+}
+

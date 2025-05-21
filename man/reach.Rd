@@ -53,6 +53,7 @@ A \code{REACH} object containing
 \item{Y}{input response matrix}
 \item{X}{input covariate matrix}
 \item{Z_}{input control variable matrix}
+\item{Z}{diagonalized control variable matrix}
 \item{B}{estimated coefficient matrix for X}
 \item{W}{estimated coefficient matrix for Z}
 \item{Theta}{a list of estimated common value matrices}
@@ -75,13 +76,13 @@ Compute solutions of regularized rank-constrained heterogeneity pursuit
 library(reach)
  ## Simulate data from a heterogeneous sparse reduced-rank regression model
  p <- 100; m <- 1; q <- 50; n <- 100; r <- 3; s = 5
- mydata <- reach.sim(n, p, q, m, r, s, rho_X = .5, sigma_X = 1, s2n = 1)
+ mydata <- reach.sim(n, p, q, m, r, s)
 
  Y <- mydata$Y
  X <- mydata$X
  Z_ <- mydata$Z_
 
- fit <- reach(Y, X, Z_, penalty = "MCP")
+ fit <- reach(Y, X, Z_, penalty = "SCAD")
 
  fit$s
  fit$K
